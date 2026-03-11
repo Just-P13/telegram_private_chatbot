@@ -1,4 +1,4 @@
-name = "telegram_private_chatbot"
+name = "telegram-private-chatbot"
 main = "worker.js"
 compatibility_date = "2024-11-30"
 
