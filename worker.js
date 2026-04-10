@@ -36,23 +36,72 @@ const topicCreateInFlight = new Map();
 // 管理员权限缓存（实例内）
 const adminStatusCache = new Map();
 
-// --- 本地题库 (15条) ---
 const LOCAL_QUESTIONS = [
-    {"question": "冰融化后会变成什么？", "correct_answer": "水", "incorrect_answers": ["石头", "木头", "火"]},
-    {"question": "正常人有几只眼睛？", "correct_answer": "2", "incorrect_answers": ["1", "3", "4"]},
-    {"question": "以下哪个属于水果？", "correct_answer": "香蕉", "incorrect_answers": ["白菜", "猪肉", "大米"]},
-    {"question": "1 加 2 等于几？", "correct_answer": "3", "incorrect_answers": ["2", "4", "5"]},
-    {"question": "5 减 2 等于几？", "correct_answer": "3", "incorrect_answers": ["1", "2", "4"]},
-    {"question": "2 乘以 3 等于几？", "correct_answer": "6", "incorrect_answers": ["4", "5", "7"]},
-    {"question": "10 加 5 等于几？", "correct_answer": "15", "incorrect_answers": ["10", "12", "20"]},
-    {"question": "8 减 4 等于几？", "correct_answer": "4", "incorrect_answers": ["2", "3", "5"]},
-    {"question": "在天上飞的交通工具是什么？", "correct_answer": "飞机", "incorrect_answers": ["汽车", "轮船", "自行车"]},
-    {"question": "星期一的后面是星期几？", "correct_answer": "星期二", "incorrect_answers": ["星期日", "星期五", "星期三"]},
-    {"question": "鱼通常生活在哪里？", "correct_answer": "水里", "incorrect_answers": ["树上", "土里", "火里"]},
-    {"question": "我们用什么器官来听声音？", "correct_answer": "耳朵", "incorrect_answers": ["眼睛", "鼻子", "嘴巴"]},
-    {"question": "晴朗的天空通常是什么颜色的？", "correct_answer": "蓝色", "incorrect_answers": ["绿色", "红色", "紫色"]},
-    {"question": "太阳从哪个方向升起？", "correct_answer": "东方", "incorrect_answers": ["西方", "南方", "北方"]},
-    {"question": "小狗发出的叫声通常是？", "correct_answer": "汪汪", "incorrect_answers": ["喵喵", "咩咩", "呱呱"]}
+    {"question": "水沸腾时的温度是多少摄氏度？", "correct_answer": "100", "incorrect_answers": ["50", "0", "200"]},
+    {"question": "一年有多少天（平年）？", "correct_answer": "365", "incorrect_answers": ["360", "366", "364"]},
+    {"question": "人有多少颗牙齿（成年人）？", "correct_answer": "32", "incorrect_answers": ["28", "30", "36"]},
+    {"question": "中国的首都是哪里？", "correct_answer": "北京", "incorrect_answers": ["上海", "广州", "深圳"]},
+    {"question": "地球围绕什么转？", "correct_answer": "太阳", "incorrect_answers": ["月亮", "火星", "自己"]},
+
+    {"question": "2+5等于多少？", "correct_answer": "7", "incorrect_answers": ["6", "8", "9"]},
+    {"question": "9-4等于多少？", "correct_answer": "5", "incorrect_answers": ["4", "6", "7"]},
+    {"question": "3×3等于多少？", "correct_answer": "9", "incorrect_answers": ["6", "8", "12"]},
+    {"question": "12÷4等于多少？", "correct_answer": "3", "incorrect_answers": ["2", "4", "6"]},
+    {"question": "7+8等于多少？", "correct_answer": "15", "incorrect_answers": ["14", "16", "13"]},
+
+    {"question": "猫的叫声是？", "correct_answer": "喵喵", "incorrect_answers": ["汪汪", "咩咩", "呱呱"]},
+    {"question": "鸭子的叫声是？", "correct_answer": "嘎嘎", "incorrect_answers": ["喵喵", "汪汪", "咩咩"]},
+    {"question": "青蛙的叫声是？", "correct_answer": "呱呱", "incorrect_answers": ["汪汪", "喵喵", "咩咩"]},
+    {"question": "马的叫声是？", "correct_answer": "嘶", "incorrect_answers": ["汪", "喵", "咩"]},
+    {"question": "鸡的叫声是？", "correct_answer": "咯咯", "incorrect_answers": ["汪汪", "喵喵", "咩咩"]},
+
+    {"question": "太阳在哪个方向落下？", "correct_answer": "西方", "incorrect_answers": ["东方", "南方", "北方"]},
+    {"question": "一天中什么时候最亮？", "correct_answer": "中午", "incorrect_answers": ["晚上", "凌晨", "半夜"]},
+    {"question": "星星通常在什么时候出现？", "correct_answer": "晚上", "incorrect_answers": ["中午", "下午", "早上"]},
+    {"question": "彩虹有几种颜色？", "correct_answer": "7", "incorrect_answers": ["5", "6", "8"]},
+    {"question": "影子是由什么产生的？", "correct_answer": "光", "incorrect_answers": ["水", "风", "土"]},
+
+    {"question": "铅笔是用来做什么的？", "correct_answer": "写字", "incorrect_answers": ["吃饭", "睡觉", "洗澡"]},
+    {"question": "剪刀是用来做什么的？", "correct_answer": "剪东西", "incorrect_answers": ["写字", "吃饭", "跑步"]},
+    {"question": "冰箱是用来做什么的？", "correct_answer": "冷藏食物", "incorrect_answers": ["加热", "洗衣", "发电"]},
+    {"question": "电灯是用来做什么的？", "correct_answer": "照明", "incorrect_answers": ["取暖", "降温", "洗衣"]},
+    {"question": "钟表是用来做什么的？", "correct_answer": "看时间", "incorrect_answers": ["听音乐", "洗衣服", "做饭"]},
+
+    {"question": "火车在什么上行驶？", "correct_answer": "轨道", "incorrect_answers": ["水", "天空", "沙子"]},
+    {"question": "船在什么上行驶？", "correct_answer": "水", "incorrect_answers": ["地上", "空中", "山上"]},
+    {"question": "汽车在什么上行驶？", "correct_answer": "道路", "incorrect_answers": ["水", "空中", "树上"]},
+    {"question": "飞机在哪里飞？", "correct_answer": "空中", "incorrect_answers": ["水里", "地上", "地下"]},
+    {"question": "潜水艇在哪里活动？", "correct_answer": "水下", "incorrect_answers": ["空中", "地面", "树上"]},
+
+    {"question": "冬天会下什么？", "correct_answer": "雪", "incorrect_answers": ["雨", "沙子", "树叶"]},
+    {"question": "春天通常有什么？", "correct_answer": "花开", "incorrect_answers": ["下雪", "结冰", "落叶"]},
+    {"question": "秋天通常有什么？", "correct_answer": "落叶", "incorrect_answers": ["开花", "下雪", "发芽"]},
+    {"question": "夏天适合做什么？", "correct_answer": "游泳", "incorrect_answers": ["滑雪", "堆雪人", "穿棉衣"]},
+    {"question": "冬天适合做什么？", "correct_answer": "滑雪", "incorrect_answers": ["游泳", "吃冰", "吹风"]},
+
+    {"question": "鱼用什么呼吸？", "correct_answer": "鳃", "incorrect_answers": ["肺", "鼻子", "嘴"]},
+    {"question": "人用什么呼吸？", "correct_answer": "肺", "incorrect_answers": ["鳃", "手", "脚"]},
+    {"question": "鸟通常在哪里筑巢？", "correct_answer": "树上", "incorrect_answers": ["水里", "地底", "空中"]},
+    {"question": "蜜蜂会采什么？", "correct_answer": "花蜜", "incorrect_answers": ["石头", "水泥", "沙子"]},
+    {"question": "蜘蛛会织什么？", "correct_answer": "网", "incorrect_answers": ["衣服", "房子", "鞋子"]},
+
+    {"question": "火可以用什么灭？", "correct_answer": "水", "incorrect_answers": ["油", "风", "空气"]},
+    {"question": "电是危险的吗？", "correct_answer": "是", "incorrect_answers": ["不是", "有时是水", "看颜色"]},
+    {"question": "刀锋利吗？", "correct_answer": "是", "incorrect_answers": ["不是", "很软", "是水"]},
+    {"question": "冰是冷的吗？", "correct_answer": "是", "incorrect_answers": ["不是", "很热", "是气体"]},
+    {"question": "火是亮的吗？", "correct_answer": "是", "incorrect_answers": ["不是", "黑色", "透明"]},
+
+    {"question": "手机可以用来做什么？", "correct_answer": "打电话", "incorrect_answers": ["做饭", "洗衣", "种地"]},
+    {"question": "电脑可以用来做什么？", "correct_answer": "上网", "incorrect_answers": ["洗澡", "种菜", "开车"]},
+    {"question": "电视可以播放什么？", "correct_answer": "节目", "incorrect_answers": ["食物", "水", "空气"]},
+    {"question": "风扇是用来做什么的？", "correct_answer": "降温", "incorrect_answers": ["加热", "洗衣", "照明"]},
+    {"question": "空调是用来做什么的？", "correct_answer": "调节温度", "incorrect_answers": ["做饭", "洗碗", "扫地"]},
+
+    {"question": "书包是用来装什么的？", "correct_answer": "书", "incorrect_answers": ["水", "火", "空气"]},
+    {"question": "鞋子是穿在什么地方的？", "correct_answer": "脚上", "incorrect_answers": ["手上", "头上", "脸上"]},
+    {"question": "帽子是戴在哪里的？", "correct_answer": "头上", "incorrect_answers": ["脚上", "手上", "嘴上"]},
+    {"question": "手套是戴在哪里的？", "correct_answer": "手上", "incorrect_answers": ["脚上", "头上", "耳朵"]},
+    {"question": "围巾是戴在哪里的？", "correct_answer": "脖子上", "incorrect_answers": ["脚上", "手上", "头上"]}
 ];
 
 // --- 辅助工具函数 ---
