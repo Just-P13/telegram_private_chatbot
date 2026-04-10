@@ -4,3 +4,12 @@ compatibility_date = "2024-11-30"
 
 # 注意：KV 命名空间 ID 每个用户都不一样，
 # 所以不能写死在这里。用户需要在 Cloudflare 后台手动绑定。
+
+# 需要在 Cloudflare Variables/Secrets 中配置：
+# BOT_TOKEN
+# SUPERGROUP_ID
+# VERIFY_MODE=turnstile
+# TURNSTILE_SITE_KEY
+# TURNSTILE_SECRET_KEY (Secret)
+# TURNSTILE_VERIFY_URL (例如 https://xxx.workers.dev)
+# TURNSTILE_SIGN_SECRET (Secret)
