@@ -985,6 +985,30 @@ async function handleAdminReply(msg, env, ctx) {
       return;
   }
 
+  if (text === "/help") {
+      const helpText = [
+          "📚 **管理员指令帮助**",
+          "",
+          "🔒 `/close` - 强制关闭对话，拒收新消息",
+          "🔓 `/open` - 重新开启对话，恢复转发",
+          "🚫 `/ban` - 封禁用户（无提示忽略）",
+          "✅ `/unban` - 解封用户，恢复通讯",
+          "🌟 `/trust` - 永久信任，免验证",
+          "🔄 `/reset` - 重置验证，下次重新验证",
+          "ℹ️ `/info` - 查看 UID / Topic / 状态",
+          "🧹 `/cleanup` - 扫描并清理已删除话题数据",
+          "📖 `/help` - 查看本帮助"
+      ].join("\n");
+
+      await tgCall(env, "sendMessage", {
+          chat_id: env.SUPERGROUP_ID,
+          message_thread_id: threadId,
+          text: helpText,
+          parse_mode: "Markdown"
+      });
+      return;
+  }
+
   // 转发管理员消息给用户
   if (msg.media_group_id) {
     await handleMediaGroup(msg, env, ctx, { direction: "t2p", targetChat: userId, threadId: undefined });
