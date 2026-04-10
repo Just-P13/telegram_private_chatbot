@@ -1001,11 +1001,22 @@ async function handleAdminReply(msg, env, ctx) {
       ].join("\n");
 
       const helpKeyboard = [
-          [{ text: "/close" }, { text: "/open" }, { text: "/info" }],
-          [{ text: "/ban" }, { text: "/unban" }],
-          [{ text: "/trust" }, { text: "/reset" }],
-          [{ text: "/cleanup" }, { text: "/help" }],
-          [{ text: "❎ 隐藏菜单" }]
+          [
+              { text: "🔒 关闭", callback_data: "admincmd:close" },
+              { text: "🔓 打开", callback_data: "admincmd:open" },
+              { text: "ℹ️ 信息", callback_data: "admincmd:info" }
+          ],
+          [
+              { text: "🚫 封禁", callback_data: "admincmd:ban" },
+              { text: "✅ 解封", callback_data: "admincmd:unban" }
+          ],
+          [
+              { text: "🌟 信任", callback_data: "admincmd:trust" },
+              { text: "🔄 重置", callback_data: "admincmd:reset" }
+          ],
+          [
+              { text: "🧹 清理", callback_data: "admincmd:cleanup" }
+          ]
       ];
 
       await tgCall(env, "sendMessage", {
@@ -1014,19 +1025,8 @@ async function handleAdminReply(msg, env, ctx) {
           text: helpText,
           parse_mode: "Markdown",
           reply_markup: {
-              keyboard: helpKeyboard,
-              resize_keyboard: true
+              inline_keyboard: helpKeyboard
           }
-      });
-      return;
-  }
-
-  if (text === "❎ 隐藏菜单") {
-      await tgCall(env, "sendMessage", {
-          chat_id: env.SUPERGROUP_ID,
-          message_thread_id: threadId,
-          text: "✅ 已隐藏快捷菜单",
-          reply_markup: { remove_keyboard: true }
       });
       return;
   }
@@ -1234,6 +1234,44 @@ async function finalizeVerification(userId, verifyId, state, env, ctx, queryFrom
 async function handleCallbackQuery(query, env, ctx) {
     try {
         const data = query.data;
+        if (data.startsWith("admincmd:")) {
+            const action = data.slice("admincmd:".length).trim();
+            const allowedActions = new Set(["close", "open", "info", "ban", "unban", "trust", "reset", "cleanup"]);
+            if (!allowedActions.has(action)) {
+                await tgCall(env, "answerCallbackQuery", {
+                    callback_query_id: query.id,
+                    text: "❌ 无效操作",
+                    show_alert: true
+                });
+                return;
+            }
+
+            const message = query.message;
+            if (!message?.message_thread_id) {
+                await tgCall(env, "answerCallbackQuery", {
+                    callback_query_id: query.id,
+                    text: "⚠️ 请在用户话题中使用",
+                    show_alert: true
+                });
+                return;
+            }
+
+            const fakeMsg = {
+                message_id: message.message_id,
+                message_thread_id: message.message_thread_id,
+                text: `/${action}`,
+                from: query.from,
+                chat: message.chat
+            };
+
+            await handleAdminReply(fakeMsg, env, ctx);
+            await tgCall(env, "answerCallbackQuery", {
+                callback_query_id: query.id,
+                text: "✅ 已执行"
+            });
+            return;
+        }
+
         if (!data.startsWith("verify:")) return;
 
         const parts = data.split(":");
