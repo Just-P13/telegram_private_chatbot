@@ -280,9 +280,9 @@ async function probeForumThread(env, expectedThreadId, { userId, reason, doubleC
 }
 
 async function resetUserVerificationAndRequireReverify(env, { userId, userKey, oldThreadId, pendingMsgId, reason }) {
-    // 清理旧映射与验证状态：用户需要重新做人机验证
-    await env.TOPIC_MAP.delete(`verified:${userId}`);
-    await env.TOPIC_MAP.put(`needs_verify:${userId}`, "1", { expirationTtl: CONFIG.NEEDS_REVERIFY_TTL_SECONDS });
+    const verifiedStatus = await env.TOPIC_MAP.get(`verified:${userId}`);
+
+    // 清理旧映射与重试计数
     await env.TOPIC_MAP.delete(`retry:${userId}`);
 
     if (userKey) {
@@ -302,6 +302,53 @@ async function resetUserVerificationAndRequireReverify(env, { userId, userKey, o
         reason
     });
 
+    // 已验证用户：自动重建话题并尽量转发当前消息，不再强制重新验证
+    if (verifiedStatus) {
+        let fromUser = { id: Number(userId), first_name: "User" };
+        try {
+            const chatInfo = await tgCall(env, "getChat", { chat_id: Number(userId) });
+            if (chatInfo.ok && chatInfo.result) {
+                fromUser = {
+                    id: chatInfo.result.id,
+                    first_name: chatInfo.result.first_name || "User",
+                    last_name: chatInfo.result.last_name,
+                    username: chatInfo.result.username
+                };
+            }
+        } catch (e) {
+            Logger.warn('recreate_topic_getchat_failed', { userId });
+        }
+
+        const nextUserKey = userKey || `user:${userId}`;
+        const rec = await getOrCreateUserTopicRec(fromUser, nextUserKey, env, Number(userId));
+
+        if (rec?.thread_id && pendingMsgId) {
+            const sent = await tgCall(env, "forwardMessage", {
+                chat_id: env.SUPERGROUP_ID,
+                from_chat_id: Number(userId),
+                message_id: pendingMsgId,
+                message_thread_id: rec.thread_id,
+            });
+            if (!sent.ok) {
+                await tgCall(env, "copyMessage", {
+                    chat_id: env.SUPERGROUP_ID,
+                    from_chat_id: Number(userId),
+                    message_id: pendingMsgId,
+                    message_thread_id: rec.thread_id
+                });
+            }
+        }
+
+        await tgCall(env, "sendMessage", {
+            chat_id: Number(userId),
+            text: "✅ 检测到旧话题已失效，已自动重建新话题，您可继续发送消息。"
+        });
+        return;
+    }
+
+    // 未验证用户：要求重新做人机验证
+    await env.TOPIC_MAP.delete(`verified:${userId}`);
+    await env.TOPIC_MAP.put(`needs_verify:${userId}`, "1", { expirationTtl: CONFIG.NEEDS_REVERIFY_TTL_SECONDS });
     await sendVerificationChallenge(userId, env, pendingMsgId || null);
 }
 
