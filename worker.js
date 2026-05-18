@@ -538,6 +538,17 @@ function setVerifiedUI(text) {
   const status = document.getElementById("status");
   status.textContent = text || "✅ 已验证，无需重复提交。";
 }
+
+function tryAutoClosePage() {
+  // 浏览器仅允许由脚本打开的窗口自动关闭；失败时保持友好提示
+  setTimeout(() => {
+    window.close();
+    if (!window.closed) {
+      const status = document.getElementById("status");
+      status.textContent = "✅ 验证成功，请返回 Telegram（此页面可手动关闭）。";
+    }
+  }, 1200);
+}
 function onTurnstileDone(token){
   if (verifiedDone) return;
   turnstileToken = token;
@@ -561,9 +572,11 @@ document.getElementById("verify-form").addEventListener("submit", async (e) => {
   });
   const data = await resp.json().catch(() => ({}));
   if (resp.ok && data.ok && data.already_verified) {
-    setVerifiedUI("✅ 已验证（请返回 Telegram）。");
+    setVerifiedUI("✅ 已验证，页面即将自动关闭…");
+    tryAutoClosePage();
   } else if (resp.ok && data.ok) {
-    setVerifiedUI("✅ 验证成功，请返回 Telegram。");
+    setVerifiedUI("✅ 验证成功，页面即将自动关闭…");
+    tryAutoClosePage();
   } else {
     status.textContent = "❌ 验证失败，请返回 Telegram 重试。";
     submitBtn.disabled = false;
@@ -764,7 +777,22 @@ async function handlePrivateMessage(msg, env, ctx) {
   const isBanned = await env.TOPIC_MAP.get(`banned:${userId}`);
   if (isBanned) return;
 
-  const verified = await env.TOPIC_MAP.get(`verified:${userId}`);
+  let verified = await env.TOPIC_MAP.get(`verified:${userId}`);
+
+  // 兼容 KV 最终一致性：若刚验证通过但命中到未同步节点，
+  // 可通过已存在的话题映射回填 verified，避免再次弹验证。
+  if (!verified) {
+    const existingRec = await safeGetJSON(env, key, null);
+    if (existingRec && existingRec.thread_id) {
+      verified = "1";
+      await env.TOPIC_MAP.put(`verified:${userId}`, "1", { expirationTtl: CONFIG.VERIFIED_EXPIRE_SECONDS });
+      await env.TOPIC_MAP.delete(`needs_verify:${userId}`);
+      Logger.warn('verified_key_backfilled_from_topic_record', {
+        userId,
+        threadId: existingRec.thread_id
+      });
+    }
+  }
 
   if (!verified) {
     const isStart = msg.text && msg.text.trim() === "/start";
