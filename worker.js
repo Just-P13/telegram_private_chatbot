@@ -10,6 +10,7 @@ const CONFIG = {
     PENDING_MAX_MESSAGES: 10,           // 验证期间最多暂存的消息数
     ADMIN_CACHE_TTL_SECONDS: 300,       // 管理员权限缓存 5 分钟
     NEEDS_REVERIFY_TTL_SECONDS: 600,    // 标记需重新验证的 TTL（用于并发兜底）
+    FORCE_REVERIFY_TTL_SECONDS: 2592000, // 管理员手动 /reset 后强制验证 30 天
     RATE_LIMIT_MESSAGE: 45,
     RATE_LIMIT_VERIFY: 3,
     RATE_LIMIT_WINDOW: 60,
@@ -777,20 +778,32 @@ async function handlePrivateMessage(msg, env, ctx) {
   const isBanned = await env.TOPIC_MAP.get(`banned:${userId}`);
   if (isBanned) return;
 
-  const needsVerify = await env.TOPIC_MAP.get(`needs_verify:${userId}`);
+  let needsVerify = await env.TOPIC_MAP.get(`needs_verify:${userId}`);
   let verified = await env.TOPIC_MAP.get(`verified:${userId}`);
 
   // 兼容 KV 最终一致性：若刚验证通过但命中到未同步节点，
   // 可通过已存在的话题映射回填 verified，避免再次弹验证。
-  if (!verified && !needsVerify) {
+  if (!verified) {
     const existingRec = await safeGetJSON(env, key, null);
-    if (existingRec && existingRec.thread_id) {
-      verified = "1";
-      await env.TOPIC_MAP.put(`verified:${userId}`, "1", { expirationTtl: CONFIG.VERIFIED_EXPIRE_SECONDS });
-      Logger.warn('verified_key_backfilled_from_topic_record', {
-        userId,
-        threadId: existingRec.thread_id
-      });
+    const hasThreadRec = !!(existingRec && existingRec.thread_id);
+
+    if (hasThreadRec) {
+      // 仅在没有进行中的挑战，且不存在管理员手动重置标记时，才把 needs_verify 视作可能的陈旧标记。
+      const activeChallenge = await env.TOPIC_MAP.get(`user_challenge:${userId}`);
+      const forceReverify = await env.TOPIC_MAP.get(`force_reverify:${userId}`);
+      if ((!needsVerify || !activeChallenge) && !forceReverify) {
+        verified = "1";
+        needsVerify = null;
+        await env.TOPIC_MAP.put(`verified:${userId}`, "1", { expirationTtl: CONFIG.VERIFIED_EXPIRE_SECONDS });
+        await env.TOPIC_MAP.delete(`needs_verify:${userId}`);
+        Logger.warn('verified_key_backfilled_from_topic_record', {
+          userId,
+          threadId: existingRec.thread_id,
+          staleNeedsVerify: !!needsVerify,
+          hadActiveChallenge: !!activeChallenge,
+          hasForceReverify: false
+        });
+      }
     }
   }
 
@@ -1076,6 +1089,7 @@ async function handleAdminReply(msg, env, ctx) {
   if (text === "/reset") {
       await env.TOPIC_MAP.delete(`verified:${userId}`);
       await env.TOPIC_MAP.put(`needs_verify:${userId}`, "1", { expirationTtl: CONFIG.NEEDS_REVERIFY_TTL_SECONDS });
+      await env.TOPIC_MAP.put(`force_reverify:${userId}`, "1", { expirationTtl: CONFIG.FORCE_REVERIFY_TTL_SECONDS });
       await tgCall(env, "sendMessage", { chat_id: env.SUPERGROUP_ID, message_thread_id: threadId, text: "🔄 **验证重置**", parse_mode: "Markdown" });
       return;
   }
@@ -1083,6 +1097,7 @@ async function handleAdminReply(msg, env, ctx) {
   if (text === "/trust") {
       await env.TOPIC_MAP.put(`verified:${userId}`, "trusted");
       await env.TOPIC_MAP.delete(`needs_verify:${userId}`);
+      await env.TOPIC_MAP.delete(`force_reverify:${userId}`);
       await tgCall(env, "sendMessage", { chat_id: env.SUPERGROUP_ID, message_thread_id: threadId, text: "🌟 **已设置永久信任**", parse_mode: "Markdown" });
       return;
   }
@@ -1312,6 +1327,7 @@ async function finalizeVerification(userId, verifyId, state, env, ctx, queryFrom
 
     await env.TOPIC_MAP.put(`verified:${userId}`, "1", { expirationTtl: CONFIG.VERIFIED_EXPIRE_SECONDS });
     await env.TOPIC_MAP.delete(`needs_verify:${userId}`);
+    await env.TOPIC_MAP.delete(`force_reverify:${userId}`);
     await env.TOPIC_MAP.delete(`chal:${verifyId}`);
     await env.TOPIC_MAP.delete(`user_challenge:${userId}`);
 
